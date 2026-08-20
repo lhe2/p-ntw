@@ -1228,6 +1228,390 @@ dfs_viz$long %>%
 ```
 
 # ## supp
+
+# # development
+
+## dev trajectories
+
+```{r}
+# shared prep + plotting
+.prepfn <- function(x){
+  x %>%
+    filter(!is.na(pop),
+           !is.na(is.sup)) %>%
+    filter(instar %in% c("wander") | grepl("\\d.*", instar)) %>%
+    mutate(sup = case_when(is.na(sup) ~ 5,
+                           TRUE ~ sup),
+           across(c("sup", starts_with("is.")), ~ as.factor(.x))) %>%
+    group_by(year, pop, trt, trt.type, trt.minT, instar, 
+             is.sup, sup, .add = TRUE) %>%
+    CalcDevSS() %>%
+    ungroup()
+}
+
+.plotfn <- function(x){
+  x %>%
+    arrange(desc(pop)) %>%
+    ggplot(aes(y = avg.logmass, x = avg.tt,
+               col = pop, lty = pop, shape = sup
+    )) +
+    facet_grid(year ~ trt, labeller = labeller(trt = c(p_scales$labs_trt))
+    ) +
+    theme_bw() +
+    labs(y = "ln[mass]", x = "days to instar",
+         col = "population", lty = "population") +
+    guides(lty = guide_legend(override.aes = list(alpha = 1),
+                              order = 1),
+           col = guide_legend(override.aes = list(alpha = 1),
+                              order = 1),
+           shape = guide_legend(override.aes = list(alpha = 1),
+                                order = 3)
+    ) 
+}
+```
+
+### successful pups only
+
+```{r}
+# successful pups only
+dfs_viz$long %>%
+  filter(is.pup > 0) %>% 
+  .prepfn() %>%
+  .plotfn() +
+  geom_point(size = 1.75, alpha = 0.8) +
+  geom_line(alpha = 0.8) +
+  labs(shape = "instars to\npupation",
+       caption = "trajectory of successful pupations")
+#ResToFig("supp_dev-traj")
+```
+
+### pmd + pups
+
+```{r}
+# shared dfs
+df <- dfs_viz$wide %>%
+  filter(!is.na(is.pup), 
+         !is.na(jdate.5th),
+         ) %>%
+  DevToLong() %>%
+  mutate(is.pup = case_when(is.pup > 1 ~ 1,
+                            TRUE ~ is.pup),
+         is.pup = factor(is.pup, levels = c(1, 0))) %>%
+  group_by(is.pup) %>% 
+  .prepfn() #%>% View()
+```
+
+
+```{r}
+# V1: all yrs simultaneously
+# pups in 5 and dead/alive sups
+# (no pmds < 5)
+df %>%
+  .plotfn() +
+  geom_point(size = 1.75) +
+  geom_line() +
+  aes(alpha = is.pup,
+      group = interaction(is.pup, pop, sup)) +
+  labs(shape = "instars to outcome", alpha = "outcome",
+       caption = "outcomes of 5ths + sups")+
+  scale_shape_manual(values = c(16, 17, 15, 7)) +
+  scale_alpha_manual(values = c(0.6, 1),
+                     labels = c(`0` = "died", `1` = "pupated")) +
+  guides(alpha = guide_legend(override.aes = list(alpha = c(0.4, 1)),
+                              order = 2))
+#ResToFig("supp_dev-traj-all")
+
+```
+
+```{r}
+# V2: separate out yrs
+.plotfn2 <- function(x){
+  x %>%
+    .plotfn() +
+    geom_point(size = 1.75, alpha = 0.7) +
+    geom_line(alpha = 0.7) +
+    aes(col = is.pup, lty = is.pup, #alpha = is.pup,
+        group = interaction(is.pup, sup)
+    ) +
+    labs(col = "outcome", lty = "outcome", 
+         shape = "instars to outcome",
+         #caption = paste0(df$year, " 5ths + sups outcomes")
+         ) +
+    facet_grid(pop ~ trt, labeller = labeller(trt = c(p_scales$labs_trt))) +
+    scale_shape_manual(values = c(16, 17, 15, 7)) +
+    scale_color_manual(values = scales::pal_brewer(palette = "Paired", direction = -1)(2),
+                       labels = c(`0` = "died", `1` = "pupated")) +
+    scale_linetype_discrete(labels = c(`0` = "died", `1` = "pupated"))
+}
+
+ps <- list_modify(
+  ps,
+  sup23 = df %>%
+    filter(year == 2023) %>% 
+    .plotfn2() + 
+    guides(shape = "none") +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_blank()),
+  sup24 = df %>%
+    filter(year == 2024) %>% 
+    .plotfn2() + 
+    theme(legend.position = "none",
+          strip.background.x = element_blank(),
+          strip.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_blank()),
+  sup25 = df %>%
+    filter(year == 2025) %>% 
+    .plotfn2() +
+    guides(shape = "none") +
+    #labs(caption = "yearly 5ths + sups outcomes") +
+    theme(strip.background.x = element_blank(),
+          strip.text.x = element_blank())
+)
+
+ps$sup23
+ps$sup24
+ps$sup25
+
+# collate (this works..)
+((ps$sup23 + theme(legend.position = "none")) +
+  (ps$sup24) +
+  (ps$sup25 + theme(legend.position = "none") 
+   )) +
+  plot_layout(ncol = 1, axes = "collect", guides = "collect"
+              ) &
+  xlim(c(0, 42)) &
+  theme(legend.position = "bottom",
+        legend.margin = margin())
+
+#ResToFig("supp_dev-traj_all-sups")
+```
+```{r eval = FALSE}
+## V3a: alternative consolidation, and include 4ths
+df <- dfs_viz$wide %>%
+  filter(!is.na(jdate.4th)) %>%
+  mutate(is.pup = case_when(is.na(is.pup) ~ 0,
+                            is.pup > 1 ~ 1,
+                            TRUE ~ is.pup),
+         sup = case_when(is.na(sup) & !is.na(jdate.5th) ~ 5,
+                         is.na(sup) & !is.na(jdate.4th) ~ 4,
+                         TRUE ~ sup),
+         across(c("sup", starts_with("is.")), ~ as.factor(.x)),
+         is.pup = factor(is.pup, levels = c(1, 0))
+         ) %>%
+  DevToLong() %>%
+  filter(instar %in% c("wander") | grepl("\\d.*", instar)) %>%
+  group_by(year, pop, trt, trt.type, trt.minT, instar, 
+           is.pup, is.sup, sup) %>%
+  CalcDevSS()
+
+.p <- function(x){
+  x %>%
+    ggplot(aes(y = avg.logmass, x = avg.tt,
+               shape = sup,
+               col = is.pup, lty = is.pup, 
+               group = interaction(is.pup, sup))) +
+    geom_point(size = 1.75) +
+    geom_line() +
+    facet_grid(pop ~ trt, labeller = labeller(trt = c(p_scales$labs_trt))) 
+}
+
+.p2 <- function(){
+  list(
+    theme_bw(),
+    labs(y = "ln[mass]", x = "days to instar",
+         col = "population", lty = "population"),
+    guides(lty = guide_legend(override.aes = list(alpha = 1),
+                              order = 1),
+           col = guide_legend(override.aes = list(alpha = 1),
+                              order = 1),
+           shape = guide_legend(override.aes = list(alpha = 1),
+                                order = 3)
+    ),
+    labs(col = "outcome", lty = "outcome", 
+         shape = "instars to outcome",
+         #caption = paste0(df$year, " 5ths + sups outcomes")
+         ),
+    scale_shape_manual(values = c(1, 16, 17, 15, 7)),
+    scale_color_manual(values = scales::pal_brewer(palette = "Paired", direction = -1)(2),
+                       labels = c(`0` = "died", `1` = "pupated")),
+    scale_linetype_discrete(labels = c(`0` = "died", `1` = "pupated"))
+  )
+}
+
+    
+ps <- list_modify(
+  ps,
+  sup23 = df %>%
+    filter(year == 2023) %>% 
+    .p(),
+    # guides(shape = "none") +
+    # theme(legend.position = "none",
+    #       axis.title.x = element_blank(),
+    #       axis.ticks.x = element_blank(),
+    #       axis.text.x = element_blank()),
+  sup24 = df %>%
+    filter(year == 2024) %>% 
+    .p(),
+    # theme(legend.position = "none",
+    #       strip.background.x = element_blank(),
+    #       strip.text.x = element_blank(),
+    #       axis.title.x = element_blank(),
+    #       axis.ticks.x = element_blank(),
+    #       axis.text.x = element_blank()),
+  sup25 = df %>%
+    filter(year == 2025) %>% 
+    .p(),
+    # guides(shape = "none") +
+    # theme(strip.background.x = element_blank(),
+    #       strip.text.x = element_blank())
+ )
+
+# collate: this does not as well -- so specify theme changes in the ggobject instead
+(ps$sup23 +
+    guides(shape = "none") +
+    theme(legend.position = "none",
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_blank())) /
+  (ps$sup24 +
+      theme(#legend.position = "none",
+          strip.background.x = element_blank(),
+          strip.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.text.x = element_blank())
+     ) /
+  (ps$sup25 +
+     guides(shape = "none") +
+    
+    theme(strip.background.x = element_blank(),
+          strip.text.x = element_blank(),
+          legend.position = "none")
+     ) +
+  plot_layout(axes = "collect", guides = "collect") &
+  .p2() &
+  theme(legend.position = "bottom")
+
+ps$sup23
+ps$sup24
+ps$sup25
+
+# (ps$sup23 / ps$sup24 / ps$sup25 ) +
+#   plot_layout(axes = "collect", guides = "collect") +
+#   .p2()
+```
+
+
+## N supernumerary
+
+```{r}
+# dfs_stats$dev_all %>%
+#   # filter(!is.na(jdate.5th)) %>%
+#   # mutate(sup = case_when(is.na(sup) ~ 5,
+#   #                           TRUE ~ sup)) %>%
+#   filter(!is.na(jdate.6th)) %>%
+#   group_by(year, pop, trt, 
+#            ) %>%
+#   mutate(N = n()) %>%
+#   group_by(sup, #is.pup
+#            .add = TRUE, ) %>%
+#   mutate(n = n(),
+#          prop = n/N
+#   ) %>%
+#   select(c(year, pop, trt, sup, N, n, prop)) %>%
+#   distinct()
+# 
+# %>%
+#   pivot_wider(names_from = "sup", names_prefix = "i",
+#               values_from = "prop") %>%
+#   mutate(across(matches("i\\d"), ~ replace_na(.x, 0)))
+  
+
+dfs_stats$dev_all %>%
+  group_by(across(c(year, pop, trt)),
+           #is.pup # need to handle 2's lol
+           ) %>%
+  summarise(N = n(),
+            prop.sup = sum(is.sup == 1, na.rm = TRUE)/N,
+            pct.sup = round(prop.sup*100, 1),
+            i6 = sum(sup == 6, na.rm = TRUE),
+            i7 = sum(sup == 7, na.rm = TRUE),
+            i8 = sum(sup == 8, na.rm = TRUE),
+            )
+```
+
+
+## pupal mass outcomes
+
+i.e. did they eclose or die (mvw)
+
+```{r}
+dfs_viz$wide %>%
+  filter(!is.na(mass.pupa)) %>%
+  mutate(mass.pupa = mass.pupa/1000) %>%
+  #DevToLong() %>%
+  ggplot(aes(x = mass.pupa, fill = as.factor(is.ec))) +
+  geom_histogram(#aes(y = ..density..), 
+                 binwidth = 0.5) +
+  facet_grid(pop ~ trt, scales = "free_y",
+             labeller = labeller(trt = p_scales$labs_trt)
+             ) +
+  theme(axis.text = element_text(angle = 45)) +
+  theme_bw() +
+  labs(x = "pupal mass (g)")
+```
+
+## cage things
+
+```{r}
+# sizes of adults
+dfs_viz$wide %>%
+  filter(!is.na(mass.eclose),
+         year != 2024,
+         if.fridge == 0,
+         if.mated == 1) %>%
+  mutate(mass.eclose = mass.eclose/1000) %>%
+  #DevToLong() %>%
+  ggplot(aes(x = mass.eclose, fill = pop)) +
+  geom_histogram(binwidth = 0.5, #position = "stack"
+                 ) +
+  facet_grid(year ~ trt, 
+             #scales = "free_x",
+             labeller = labeller(trt = p_scales$labs_trt)
+             ) +
+  theme(axis.text = element_text(angle = 45)) +
+  theme_bw() +
+  labs(x = "adult mass (g)")
+```
+
+```{r}
+# lifespan and adult mass
+dfs_viz$wide %>%
+  filter(!is.na(mass.eclose),
+         year != 2024,
+         if.fridge == 0,
+         if.mated == 1) %>%
+  mutate(mass.eclose = mass.eclose/1000) %>%
+  #DevToLong() %>%
+  ggplot(aes(y = tt.long,x = mass.eclose, 
+             shape = pop, col = year)) +
+  geom_smooth(aes(lty = pop), method = "lm", lwd = 0.5, alpha = 0.6) +
+  geom_point(size = 1.5, alpha = 0.5) +
+  # facet_grid(year ~ trt, 
+  #            #scales = "free_x",
+  #            labeller = labeller(trt = p_scales$labs_trt)
+  #            ) +
+  # theme(axis.text = element_text(angle = 45)) +
+  theme_bw() +
+  labs(x = "adult mass (g)")
+```
+
+
+
 # # reproduction
 TODO
 - check that all the tents being counted are actually tents for mating lol (e.g. wtf is 107-H in 2023)
