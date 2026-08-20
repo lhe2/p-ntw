@@ -418,7 +418,8 @@ p$surv_pup + theme(legend.position = "none") +
 #ResToFig("supp/dev-surv")
 ```
 
-## sample sizes
+## supp: sample sizes
+
 ```{r}
 dfs_viz$wide %>%
   group_by(year, pop, trt) %>%
@@ -426,7 +427,8 @@ dfs_viz$wide %>%
             wand = sum(!is.na(jdate.wander), na.rm = TRUE),
             pup = sum(is.pup == 1, na.rm = TRUE),
             ec = sum(is.ec == 1, na.rm = TRUE),
-            LPI = sum(is.pup == 2, na.rm = TRUE)) #%>% ResToCsv("dev/n/surv")
+            #LPI = sum(is.pup == 2, na.rm = TRUE)
+            ) #%>% ResToCsv("dev/n/surv")
 ```
 
 
@@ -757,8 +759,6 @@ anova(mods$m3) #%>% ResToCsv("dev/anova/mass-ec")
 summary(mods$m3)
 ```
 
-
-
 ## collated figs
 
 ```{r}
@@ -1022,9 +1022,9 @@ p$time_pup+ p$time_ec +
 #ResToFig("supp/dev-time")
 ```
 
-## supernumerary
+## supp: supernumerary
 
-```{r}
+```{r eval = FALSE}
 dfs_viz$long %>%
   filter(is.pup > 0,
          !is.na(pop)) %>%
@@ -1227,8 +1227,8 @@ dfs_viz$long %>%
            ends_with("tt"))) #%>% ResToCsv("dev/ss/timeto-longevity")
 ```
 
-# ## (5) reproduction
-# reproduction
+# ## supp
+# # reproduction
 TODO
 - check that all the tents being counted are actually tents for mating lol (e.g. wtf is 107-H in 2023)
 
@@ -1536,10 +1536,7 @@ drop1(mods$expt_all, test = "Chisq") # int is ns
 drop1(update(mods$expt_all, ~ . - trt.minT:mate.ishs), test = "Chisq") # minT is sig
 ```
 
-
-
-
-## sample size tables
+## sample sizes
 
 ### egg counts
 ```{r}
@@ -1548,7 +1545,7 @@ dfs_viz$eggs_ss %>%
            starts_with(c("n.", "avg.", "se.")))) #%>% ResToCsv("egg results")
 ```
 
-## [ ] sample sizes
+### mating replicates
 ```{r}
 # TODO ideally use the same as the viz but maybe need to use the stats one lol cuz its on the per-tent level
 # need to check the colony filtering on this...
@@ -1573,7 +1570,7 @@ dfs_stats$eggs %>%
             avg.rat = mean(rat),
             avg.ads = mean(tot.ads),
             tot.coll = sum(n.coll),
-            tot.hatch = sum(n.hatch)) %>% View() #%>% ResToCsv("tents/n/pertrt")
+            tot.hatch = sum(n.hatch)) #%>% View() #%>% ResToCsv("tents/n/pertrt")
 ```
 
 # ## dump (ref only)
