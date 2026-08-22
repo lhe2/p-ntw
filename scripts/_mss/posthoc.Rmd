@@ -15,7 +15,7 @@ main script was getting way too long
 here::i_am("scripts/_mss/posthoc.Rmd")
 ```
 
-- for NTW, models fit based on final models from `final-res.Rmd`. for CTRL, checked if int was sig.
+- for NTW and CTRL comparisons, used interactive models. 
 - if int was sig in either NTW or CTRL models, did simple contrasts. if int was ns, used additive model and got EMMs per factor. 
 
 ## loading
@@ -51,10 +51,36 @@ anova(mods, update(mods, . ~ . - pop:trt.minT),
 drop1(update(mods, . ~ . - pop:trt.minT), test = "Chisq") # both are sig
 
 emms <- emmeans(mods, c("pop", "trt.minT"), type = "response")
+emms
 
 # pairs(emms, simple = "pop") 
 # pairs(emms, simple = "trt.minT")
+# test effects to e/o
 pairs(emms, simple = "each", combine = TRUE) 
+contrast(emms, interaction = "pairwise")
+
+
+
+# understanding wtf im doing w these tests
+  ## test if means are different
+test(pairs(emms, simple = "each", combine = TRUE), type = "response", adjust = "bonferroni") 
+  # tests pw contrasts, i.e. ME1 compared to e/o at the level of ME2
+  # same as pairs(emms, simple = "each", combine = TRUE)
+  # this is more of what we want bc we are interested in effects
+test(emms, adjust = "bonferroni")# same as below
+test(emms, joint = FALSE, type = "response", adjust = "bonferroni") 
+  # on default settings (delta = 0), tests superiority
+  # ie compare H ((estimate - null)/SE) to H0 (depends on "null" value)
+  # if null = 0, tests if grps are different from e/o.
+  # so rly just use this to get the estimate of the reponse
+joint_tests(emms, adjust = "bonferroni") 
+  # anova type III (are all effs (ME + IE) signif ≠ 0? (ignoring int))
+
+## are means different from e/o?
+summary(emms, type = "response", infer = c(TRUE))
+summary(emms, type = "response", infer = c(TRUE, FALSE)) # same as test(joint = FALSE)
+summary(emms, type = "response", infer = c(FALSE, TRUE))
+summary(emms, type = "response", infer = c(FALSE))
 ```
 
 ```{r}
@@ -73,10 +99,16 @@ drop1(mods$add, test = "Chisq") # pop is sig
 
 # get means and compare
 emms <- emmeans(mods$int, c("pop", "trt.type"), type = "response")
+emms %>% tidy() %>% write_clip()
 
 # pairs(emms, simple = "pop") 
 # pairs(emms, simple = "trt.type")
 pairs(emms, simple = "each", combine = TRUE)
+contrast(emms, interaction = "pairwise")
+
+test(emms, adjust = "bonferroni")
+
+summary(emms, infer = c(TRUE, TRUE))
 ```
 
 ## adult
@@ -86,19 +118,28 @@ pairs(emms, simple = "each", combine = TRUE)
 mods <- glmer(is.ec ~ pop*trt.minT + (1|year),
              family = "binomial", data = dfs_stats$dev_expt)
 
-anova(mods, update(mods, . ~ . - pop:trt.minT),
-      test = "Chisq") # int is ns
+drop1(mods, test = "Chisq") # int is ns
+# anova(mods, update(mods, . ~ . - pop:trt.minT),
+#       test = "Chisq") 
 drop1(update(mods, . ~ . - pop:trt.minT), test = "Chisq") # pop is sig
 
 # get emms separately
 emms <- list(
   pop = emmeans(mods, "pop", type = "response"),
-  trt = emmeans(mods, "trt.minT", type = "response")
+  trt = emmeans(mods, "trt.minT", type = "response"),
+  int = emmeans(mods, c("pop", "trt.minT"), type = "response") 
+    ## altho int is ns hard to talk abt means when effs are separated lol
   )
+test(emms$pop, adjust = "bonferroni") 
+test(emms$trt, adjust = "bonferroni")
+test(emms$int, adjust = "bonferroni")
 
+# test effs
 pairs(emms$pop)
 pairs(emms$trt)
 rbind(pairs(emms$pop), pairs(emms$trt))
+
+contrast(emms$int, interaction = "pairwise")
 ```
 
 ```{r}
@@ -120,8 +161,12 @@ drop1(mods$add, test = "Chisq") # pop is sig
 # get means and compare
 emms <- list(
   pop = emmeans(mods$int, "pop", type = "response"),
-  trt = emmeans(mods$int, "trt.type", type = "response")
+  trt = emmeans(mods$int, "trt.type", type = "response"),
+  int = emmeans(mods$int, c("pop", "trt.type"), type = "response") 
 )
+test(emms$pop, adjust = "bonferroni")
+test(emms$trt, adjust = "bonferroni")
+test(emms$int, adjust = "bonferroni")
   
 pairs(emms$pop) 
 pairs(emms$trt)
@@ -144,8 +189,8 @@ emms <- list(
   int = emmeans(mods, c("pop", "trt.minT")),
   sex = emmeans(mods, "sex")
   )
-emms$int
-
+test(emms$int, adjust = "bonferroni")
+test(emms$sex, adjust = "bonferroni")
 
 pairs(emms$int, simple = "pop")
 pairs(emms$int, simple = "trt.minT")
@@ -154,7 +199,12 @@ pairs(emms$sex)
 
 rbind(pairs(emms$int, simple = "each", combine = TRUE), pairs(emms$sex))
 
-# visualise...
+# looking at interactions..
+contrast(emms$int, interaction = "pairwise")
+joint_tests(mods, by = "sex") 
+joint_tests(mods)
+
+## visualise...
 with_emm_options(gg.theme = ggplot2::theme_bw(),
                  emmip(mods, pop ~ trt.minT | sex, 
       CIs = TRUE, 
@@ -180,11 +230,14 @@ emms <- list(
   int = emmeans(mods, c("pop", "trt.type")),
   sex = emmeans(mods, "sex")
   )
+test(emms$int, adjust = "bonferroni")
+test(emms$sex, adjust = "bonferroni")
 
 # pairs(emms$int, simple = "pop")
 # pairs(emms$int, simple = "trt.type")
 # pairs(emms$sex)
-rbind(pairs(emms$int, simple = "each", combine = TRUE), pairs(emms$sex))
+rbind(pairs(emms$int, simple = "each", combine = TRUE), pairs(emms$sex)) %>% tidy() %>% write_clip()
+contrast(emms$int, interaction = "pairwise")
 ```
 
 ## adult
@@ -199,12 +252,17 @@ emms <- list(
   int = emmeans(mods, c("pop", "trt.minT")),
   sex = emmeans(mods, "sex")
   )
+# test grps
+test(emms$int, adjust = "bonferroni")
+test(emms$sex, adjust = "bonferroni")
 
+# test effs
 pairs(emms$int, simple = "pop")
 pairs(emms$int, simple = "trt.minT")
 pairs(emms$sex)
 
 rbind(pairs(emms$int, simple = "each", combine = TRUE), pairs(emms$sex))
+contrast(emms$int, interaction = "pairwise")
 ```
 
 ```{r}
@@ -221,12 +279,15 @@ emms <- list(
   int = emmeans(mods, c("pop", "trt.type")),
   sex = emmeans(mods, "sex")
   )
+test(emms$int, adjust = "bonferroni")
+test(emms$sex, adjust = "bonferroni")
 
 pairs(emms$int, simple = "pop")
 pairs(emms$int, simple = "trt.type")
 pairs(emms$sex)
 
 rbind(pairs(emms$int, simple = "each", combine = TRUE), pairs(emms$sex))
+contrast(emms$int, interaction = "pairwise")
 ```
 
 
@@ -243,8 +304,12 @@ anova(mods, type = 2) # ME are sig, int is ns
 # get EMMs
 emms <- list(
   pop = emmeans(mods, "pop"),
-  trt = emmeans(mods, "trt.minT")
+  trt = emmeans(mods, "trt.minT"),
+  int = emmeans(mods, c("pop", "trt.minT"))
 )
+test(emms$pop, adjust = "bonferroni")
+test(emms$trt, adjust = "bonferroni")
+test(emms$int, adjust = "bonferroni")
   
 pairs(emms$pop)
 pairs(emms$trt)
@@ -263,11 +328,13 @@ anova(mods, type = 2) # all sig
 
 # get means and compare
 emms <- emmeans(mods, c("pop", "trt.type"))
+test(emms, adjust = "bonferroni")
 
 # pairs(emms, simple = "pop")
 # pairs(emms, simple = "trt.type")
 
 pairs(emms, simple = "each", combine = TRUE)
+contrast(emms, interaction = "pairwise")
 ```
 
 ## adult
@@ -281,8 +348,12 @@ anova(mods, type = 2) # trt is sig, int is ns
 # get EMMs
 emms <- list(
   pop = emmeans(mods, "pop"),
-  trt = emmeans(mods, "trt.minT")
+  trt = emmeans(mods, "trt.minT"),
+  int = emmeans(mods, c("pop", "trt.minT"))
 )
+test(emms$pop, adjust = "bonferroni")
+test(emms$trt, adjust = "bonferroni")
+test(emms$int, adjust = "bonferroni")
   
 # pairs(emms$pop) %>% tidy()
 # pairs(emms$trt) %>% tidy()
@@ -301,11 +372,13 @@ anova(mods, type = 2) # all sig
 
 # get means and compare
 emms <- emmeans(mods, c("pop", "trt.type"))
+test(emms, adjust = "bonferroni")
 
 # pairs(emms, simple = "pop")
 # pairs(emms, simple = "trt.type")
 
 pairs(emms, simple = "each", combine = TRUE)
+contrast(emms, interaction = "pairwise")
 ```
 
 # # lifespan
@@ -326,6 +399,8 @@ emms <- list(
   pop = emmeans(mods, "pop"),
   trt = emmeans(mods, "trt.minT")
   )
+test(emms$pop, adjust = "bonferroni") %>% tidy() %>% write_clip()
+test(emms$trt, adjust = "bonferroni") %>% tidy() %>% write_clip()
 
 pairs(emms$pop)
 pairs(emms$trt)
@@ -384,6 +459,8 @@ emms <- list(
   pop = emmeans(mods, "pop"),
   trt = emmeans(mods, "trt.minT")
   )
+test(emms$pop, adjust = "bonferroni") %>% tidy() %>% write_clip()
+test(emms$trt, adjust = "bonferroni") %>% tidy() %>% write_clip()
 
 pairs(emms$pop)
 pairs(emms$trt)
@@ -405,6 +482,8 @@ emms <- list(
   pop = emmeans(mods, "pop"),
   trt = emmeans(mods, "trt.type")
   )
+test(emms$pop, adjust = "bonferroni") %>% tidy() %>% write_clip()
+test(emms$trt, adjust = "bonferroni") %>% tidy() %>% write_clip()
 
 pairs(emms$pop)
 pairs(emms$trt)
