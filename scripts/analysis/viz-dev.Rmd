@@ -2364,6 +2364,9 @@ df %>%
     labs(y = "longevity (days after eclosion)") 
 }
 
+# subtract out fridge days?
+df2 <- dfs_all$long
+dfs["instar" == long & "if.fridge" == 1,]
 # EDA: keep fridge bugs in the count
 dfs_all$long %>%
   .prepfn() %>%
@@ -2380,6 +2383,7 @@ dfs_all$long %>%
     group_by(if.fridge) %>%
   .prepfn() %>%
   CalcDevSS() %>% #View()
+  #filter(pop == "lab") %>%
   .plotfn() +
   aes(group = interaction(pop, if.fridge),
       lty = if.fridge, shape = if.fridge) +

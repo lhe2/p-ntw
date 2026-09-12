@@ -16,12 +16,13 @@ here::i_am("scripts/_mss/posthoc.Rmd")
 ```
 
 - for NTW and CTRL comparisons, used interactive models. 
-- if int was sig in either NTW or CTRL models, did simple contrasts. if int was ns, used additive model and got EMMs per factor. 
+- if int was sig in either NTW or CTRL models, did simple contrasts + interaction contrast. if int was ns, used additive model and got EMMs per factor. 
 
 ## loading
 
 ```{r data and lib, message=FALSE}
 library(emmeans) # post-hoc tests
+
 source(here::here("scripts/_mss/load.R"))
 
 # create df of just same minT group
@@ -55,14 +56,32 @@ emms
 
 # pairs(emms, simple = "pop") 
 # pairs(emms, simple = "trt.minT")
-# test effects to e/o
-pairs(emms, simple = "each", combine = TRUE) 
-contrast(emms, interaction = "pairwise")
+# examine pw contrasts of main effs and interaction
+pairs(emms, simple = "each", combine = TRUE, infer = TRUE,
+      bias.adjust = TRUE, sigma = as.numeric(VarCorr(mods))) 
+contrast(emms, interaction = "pairwise", infer = TRUE, 
+         bias.adjust = TRUE, sigma = as.numeric(VarCorr(mods))) 
 
+### TESTING DUMP TO MOVE/WRITEUP
+# more testing dump
+# # test MEs and interactions
+#   ## i think these are the same as above but just with infer = TRUE
+#   ## re: bias adjustment: sigma is < 1 so ORs arent that diff w/o adjustment 
+# test(pairs(emms, simple = "each", combine = TRUE, infer = TRUE),
+#      bias.adjust = TRUE, sigma = as.numeric(VarCorr(mods)))
+# confint(pairs(emms, simple = "each", combine = TRUE, infer = TRUE, type = "response"),
+#         bias.adjust = TRUE, sigma = as.numeric(VarCorr(mods))
+#         )
 
-
+# # not these...?
+# contrast(emms, #"consec", # "consec" drops 19-33 comparison
+#          simple = "each", combine = TRUE, infer = TRUE)
+# pairs(emms, simple = "each", combine = TRUE) # just add in the infer=TRUE
+```
+```{r eval=FALSE}
 # understanding wtf im doing w these tests
-  ## test if means are different
+
+## test if means are different
 test(pairs(emms, simple = "each", combine = TRUE), type = "response", adjust = "bonferroni") 
   # tests pw contrasts, i.e. ME1 compared to e/o at the level of ME2
   # same as pairs(emms, simple = "each", combine = TRUE)
@@ -81,7 +100,11 @@ summary(emms, type = "response", infer = c(TRUE))
 summary(emms, type = "response", infer = c(TRUE, FALSE)) # same as test(joint = FALSE)
 summary(emms, type = "response", infer = c(FALSE, TRUE))
 summary(emms, type = "response", infer = c(FALSE))
+
+## (note these are all testing if mean1 - mean2 ≠ 0, 
+## not if mean1 ≠ 0(?), which is what emmeans() by itself can do)
 ```
+
 
 ```{r}
 # CTRL VS EXPT
@@ -490,4 +513,39 @@ pairs(emms$trt)
 rbind(pairs(emms$pop), pairs(emms$trt))
 ```
 
-# eggs laid
+# # eggs laid
+
+## 2023
+```{r}
+df <- dfs_stats$eggs %>%
+  filter(year == 2023)
+```
+
+
+```{r}
+# (fit mods separately for w/in and btwn..?)
+
+# trying to do all trts tgt
+mods <- list(
+  all = glmer(n.coll ~ trt.minT + mate.ishs + (1|cage), offset = log(n.f),
+              family = "poisson", data = df),
+  all2 = glmer(n.coll ~ trt.type + trt.minT + mate.istrt + (1|cage), offset = log(n.f),
+               family = "poisson", data = df)
+)
+
+drop1(mods$all, test = "Chisq") # all ns
+drop1(mods$all2, test = "Chisq") # all ns
+
+emms <- list(
+  all = emmeans(mods$all, ~ .),
+  all2 = emmeans(mods$all2, ~ .)
+) 
+
+emms$all
+emms$all %>% rbind() # this makes more sense...
+emms$all2 %>% rbind()
+
+pairs(emms$all, infer = TRUE)
+pairs(emms$all2, infer = TRUE)
+```
+
