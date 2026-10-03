@@ -6,6 +6,28 @@
 
 source(here::here("scripts/tidy/R/dev.R"))
 
+# util fn (useful here but also elsewhere for on-the-fly manipulation of wide data)
+# TODO could drop jdate column after pivot maybe?
+
+DevToLong <- function(wide_df){
+  wide_df %>%
+    pivot_longer(cols = starts_with(c("jdate", "mass", "tt")),
+                 names_to = c(".value", "instar"),
+                 values_drop_na = TRUE,
+                 names_pattern = ("([a-z]*\\d*)\\.(\\d*[a-z]*)")) %>%
+    
+    # # drop empty dev times but keep masses
+    # mutate(tt = case_when(is.na(tt) & !is.na(mass) ~ 999,
+    #                       TRUE ~ as.numeric(tt))) %>%
+    # drop_na(tt) %>%
+    # mutate(tt = na_if(tt, 999)) %>%
+    
+    # drop longevity durations for short-lived eclosed bugs/culled on eclosion
+    filter(!(instar == "long" & tt == 0))
+}
+
+# data prep
+
 dfs_tidy <- list(
   wide = df_wide %>%
     # NOTE: not sure where else this used aside from dev EDAs?

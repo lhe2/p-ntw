@@ -15,7 +15,7 @@ source(here("scripts/wrangle/utils.R"))
 # pivoting ----------------------------------------------------------------
 
 # see wrangle/utils for SSToLong
-# see tidy/dev for DevToLong
+# see dev data loading for DevToLong
 
 
 # dev calcs -----------------------------------------------------------------

@@ -2185,7 +2185,7 @@ dfs_tidy$long %>%
 df <- dfs_tidy$wide %>% 
   mutate(mass.change = (mass.pupa - mass.eclose)/mass.pupa,
          mass.prop = mass.pupa/mass.eclose) %>%
-  ToLong() %>%
+  DevToLong() %>%
   # PrepAdultSS() %>%
   filter(instar %in% c("pupa", "eclose", "change", "prop")) %>%
   group_by(across(c(pop, diet, starts_with("trt"), instar))) %>%

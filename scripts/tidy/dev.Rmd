@@ -403,29 +403,6 @@ df_wide <- df_wide %>%
 
 ```
 
-
-## pivot fn
-```{r}
-# TODO could drop jdate column after pivot maybe?
-# TODO move this elsewhere? (wrangle-*.R?)
-DevToLong <- function(wide_df){
-  wide_df %>%
-    pivot_longer(cols = starts_with(c("jdate", "mass", "tt")),
-                 names_to = c(".value", "instar"),
-                 values_drop_na = TRUE,
-                 names_pattern = ("([a-z]*\\d*)\\.(\\d*[a-z]*)")) %>%
-    
-    # # drop empty dev times but keep masses
-    # mutate(tt = case_when(is.na(tt) & !is.na(mass) ~ 999,
-    #                       TRUE ~ as.numeric(tt))) %>%
-    # drop_na(tt) %>%
-    # mutate(tt = na_if(tt, 999)) %>%
-  
-  # drop longevity durations for short-lived eclosed bugs/culled on eclosion
-  filter(!(instar == "long" & tt == 0))
-}
-```
-
 # # cleanup
 ```{r remove intermediate objects}
 rm(dfs_imported, dfs_filtered, dfs_stdised)
