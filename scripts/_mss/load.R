@@ -156,7 +156,7 @@ dfs_stats <- list(
              pop != "col",
              !is.na(is.pup), # drop culled bugs
       ) %>%
-      # convert LPIs to 1's
+      # LPIs: treat like pups (but drop mass bc not accurate)
       mutate(is.pup = case_when(!is.na(jdate.LPI) ~ 1,
                                 TRUE ~ is.pup)) %>%
       # factorise and set reference levels

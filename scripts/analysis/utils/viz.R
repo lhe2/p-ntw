@@ -5,6 +5,7 @@
 p_scales <- list(
   # axes labels
   xlab_minT = "minimum larval temperature (°C)",
+  xlab_trt = "temperature treatment (°C)", 
   
   # labels
   labs_trt = c("260" = "26-26", "419" = "40-19", "426" = "40-26", "433" = "40-33"),

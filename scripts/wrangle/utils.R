@@ -18,13 +18,14 @@ seprop <- function(p, n){
 
 ## PLOTTING/PIVOTING ##
 
-# see the tidy/dev.Rmd for DevToLong() (bc stats uses long data)
-
 # pivoting for more condensed plotting of SS
-# generic: mostly for dev data but works for anything with the "avg.*", "se.*" name format
+# generic: mostly for dev data but works for anything with the "avg.*", "se.*, "prop.*" name format
 SSToLong <- function(wide_ss){
   wide_ss %>%
-    pivot_longer(cols = starts_with(c("avg", "se")),
+    pivot_longer(cols = starts_with(c("avg", "se", "prop")),
                  names_to = c(".value", "response"),
-                 names_pattern = "^(avg|se)\\.(.*)")
+                 names_pattern = "^(avg|se|prop)\\.(.*)")
 }
+
+
+# see analysis/load-dev.R for DevToLong() (bc stats uses long data)

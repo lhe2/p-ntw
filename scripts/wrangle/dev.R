@@ -108,7 +108,7 @@ CalcSurvProps_def <- function(wide_df){
 ## supernumerary proportions (same as PrepSurvProps?)
 PrepSupProps <- function(wide_df){
   wide_df %>%
-    filter(!is.na(pup), # drop culled
+    filter(!is.na(is.pup), # drop culled
            pop != "col") %>% 
     # TODO add group by sup so that math is less work below LOL?
     group_by(across(c(year, pop, diet, starts_with("trt"))), .add = TRUE) 
