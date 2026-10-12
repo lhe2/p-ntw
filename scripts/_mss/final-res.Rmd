@@ -248,10 +248,11 @@ ps <- list_modify(
     dfs_viz$wide %>%
     CalcSurvProps_def() %>%
     .plotfn() +
-    geom_point(aes(size = n.pup), alpha = 0.6) +
+    #geom_point(aes(size = n.pup), alpha = 0.6) + # better?
     #geom_point(aes(size = sqrt(n))) +
     labs(y = "% survival to eclosion",
-         size = "N") +
+         #size = "N"
+         ) +
     #scale_size_area(max_size = 6.5) +
     facet_wrap(~year) 
   # TODO adjust y-lim if including pt size
@@ -422,9 +423,9 @@ p$surv_pup + theme(legend.position = "none",
 # supp
 (ps$surv_pup + 
     theme(legend.position = "top",
-                     legend.margin = margin()) +
-    labs(y = "% survival\nto pupation",
-                    x = element_blank())
+          legend.margin = margin(),
+          axis.title.x = element_blank()) +
+    labs(y = "% survival\nto pupation",)
   ) / 
   (ps$surv_ec + 
      labs(y = "% survival\nto eclosion") +
@@ -433,9 +434,9 @@ p$surv_pup + theme(legend.position = "none",
            strip.background.x = element_blank(),
            strip.text.x = element_blank())
    ) +
+  plot_annotation(tag_levels = "A") +
   plot_layout(axes = "collect", #guides = "collect"
-              ) &
-  plot_annotation(tag_levels = "A")
+              )
 
 #ResToFig("supp/dev-surv")
 ```
@@ -1750,7 +1751,7 @@ df %>%
 
 ### patchwork
 ```{r}
-ps$dev_mortality / ps$dev_GRwander +
+ps$dev_GRwander / ps$dev_mortality +
   plot_annotation(tag_levels = "A") +
   plot_layout() &
   theme(#legend.position = "bottom", 
@@ -1853,6 +1854,8 @@ ps <- list_modify(
 
 ps$sup_prop_Tmin
 ps$sup_prop_pop
+
+#ResToFig("supp/prop_sup")
 ```
 
 ### supernumerary dev time
@@ -1894,8 +1897,8 @@ ps <- list_modify(
                   lty = "solid", show.legend = FALSE, width = 0.25) +
     #facet_grid(is.pup ~ sup) +
     facet_wrap(~sup, labeller = as_labeller(c('5' = '5 instars', '6' = '6 instars', '7' = '7 instars'))) +
-    geom_point(aes(size = n), alpha = 0.8) +
-    #geom_point(size = 2) +
+    #geom_point(aes(size = n), alpha = 0.8) +
+    geom_point(size = 2) +
     geom_line() +
     # scale_color_manual(values = c("ctrl.0" = "#A6CEE3", "ctrl.1" = "#1F78B4", 
     #                               "expt.0" = "#FDBF6F", "expt.1" = "#FF7F00"),
@@ -1984,7 +1987,7 @@ ps <- list_modify(
 
 ps$pupmass_surv
 
-#ResToFig("supp/pupmass-surv.png")
+#ResToFig("supp/pupmass-surv")
 ```
 
 ### time to eclosion
@@ -2041,7 +2044,7 @@ ps <- list_modify(
   #                    ) +
   labs(#x = "pupal mass (g)",
        x = "% weight loss after eclosion",
-       y = "days to eclosion",
+       y = "pupal duration (days)",
        col = "population", shape = "population", lty = "population"
        #fill = "eclosed?",
        #caption = "(not always clear if pupae died)"
@@ -2057,8 +2060,8 @@ ps <- list_modify(
   guides(color = guide_legend(override.aes = list(size = 2,
                                                   alpha = 1,
                                                   lwd = 0.75,
-                                                  fill = NA
-                                                  #linetype = c(1, 2)
+                                                  fill = NA,
+                                                  linetype = c("solid", "255F")
                                                   )
                               )
   )
@@ -2066,19 +2069,23 @@ ps <- list_modify(
 
 ps$pupmass_timeec
 
-#ResToFig("supp/pupmass-timeec.png")
+#ResToFig("supp/pupmass-timeec")
 
 ```
 
+### patchwork
+
 ```{r}
-(ps$pupmass_surv | ps$pupmass_timeec) +
-  plot_layout(guides = "collect") &
-  theme(legend.position = "bottom",
-        legend.key.justification = "center",
+(ps$pupmass_surv / ps$pupmass_timeec) +
+  plot_annotation(tag_levels = "A") +
+  plot_layout(#guides = "collect"
+    ) &
+  theme(#legend.position = "bottom",
+        #legend.key.justification = "center",
         #legend.margin = margin()
         )
 
-ResToFig("supp/pupmass-outcomes")
+#ResToFig("supp/pupmass-outcomes")
 
 # get R^2
 df <- dfs_viz$wide %>%
