@@ -21,7 +21,8 @@ here::i_am("scripts/_mss/posthoc.Rmd")
 ## loading
 
 ```{r data and lib, message=FALSE}
-library(emmeans) # post-hoc tests
+library(emmeans)
+library(multcomp) # for cld
 
 source(here::here("scripts/_mss/load.R"))
 
@@ -54,6 +55,7 @@ drop1(update(mods, . ~ . - pop:trt.minT), test = "Chisq") # both are sig
 emms <- emmeans(mods, c("pop", "trt.minT"), type = "response")
 emms
 
+# pw comparisons (but also see below)
 # pairs(emms, simple = "pop") 
 # pairs(emms, simple = "trt.minT")
 # examine pw contrasts of main effs and interaction
@@ -77,6 +79,12 @@ contrast(emms, interaction = "pairwise", infer = TRUE,
 # contrast(emms, #"consec", # "consec" drops 19-33 comparison
 #          simple = "each", combine = TRUE, infer = TRUE)
 # pairs(emms, simple = "each", combine = TRUE) # just add in the infer=TRUE
+
+# (continued in the next chunk)
+
+# cld
+cld(emms, adjust = "bonferroni")
+cld(emms, adjust = "bonferroni", signif.sets = TRUE)
 ```
 ```{r eval=FALSE}
 # understanding wtf im doing w these tests
@@ -132,8 +140,16 @@ contrast(emms, interaction = "pairwise")
 test(emms, adjust = "bonferroni")
 
 summary(emms, infer = c(TRUE, TRUE))
+
+# cld
+cld(emms, adjust = "bonferroni")
 ```
 
+```{r}
+# cld'ing
+df <- df_stats$dev_all %>%
+  mutate(trt = paste0(trt.type, "-", trt.minT))
+```
 ## adult
 
 ```{r}
