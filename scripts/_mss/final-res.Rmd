@@ -441,20 +441,6 @@ p$surv_pup + theme(legend.position = "none",
 #ResToFig("supp/dev-surv")
 ```
 
-## supp: sample sizes
-
-```{r}
-dfs_viz$wide %>%
-  group_by(year, pop, trt) %>%
-  summarise(n = sum(!is.na(is.pup)),
-            wand = sum(!is.na(jdate.wander), na.rm = TRUE),
-            pup = sum(is.pup == 1, na.rm = TRUE),
-            ec = sum(is.ec == 1, na.rm = TRUE),
-            #LPI = sum(is.pup == 2, na.rm = TRUE)
-            ) #%>% ResToCsv("dev/n/surv")
-```
-
-
 # (2) mass 
 
 ```{r plot fn mass}
@@ -1094,23 +1080,6 @@ p$time_pup+ p$time_ec +
 #ResToFig("supp/dev-time")
 ```
 
-## supp: supernumerary
-
-```{r eval = FALSE}
-dfs_viz$long %>%
-  filter(is.pup > 0,
-         !is.na(pop)) %>%
-  group_by(is.sup) %>%
-  CalcDevSS_ad() %>% 
-  filter(instar == "pupa") %>% #View()
-  .plotfn() +
-  #aes(alpha = as.factor(is.sup)) +
-  geom_line(aes(group = interaction(trt.type, pop))) +
-  #scale_alpha_manual(values = c(`0` = 1, `1` = 0.7)) +
-  facet_grid(is.sup ~ year, labeller = labeller(is.sup = c("0" = "5 instars",
-                                                           "1" = "6+ instars"))) +
-  labs(y = "time to pupation (days)")
-```
 
 # (4) lifespan
 
@@ -1301,880 +1270,53 @@ dfs_viz$long %>%
 
 # ## supp
 
-# # development
+# # tables
 
-## dev trajectories
-
-```{r}
-# shared prep + plotting
-.prepfn <- function(x){
-  x %>%
-    filter(!is.na(pop),
-           !is.na(is.sup)) %>%
-    filter(instar %in% c("wander") | grepl("\\d.*", instar)) %>%
-    mutate(sup = case_when(is.na(sup) ~ 5,
-                           TRUE ~ sup),
-           across(c("sup", starts_with("is.")), ~ as.factor(.x))) %>%
-    group_by(year, pop, trt, trt.type, trt.minT, instar, 
-             is.sup, sup, .add = TRUE) %>%
-    CalcDevSS() %>%
-    ungroup()
-}
-
-.plotfn <- function(x){
-  x %>%
-    arrange(desc(pop)) %>%
-    ggplot(aes(y = avg.logmass, x = avg.tt,
-               col = pop, lty = pop, shape = sup
-    )) +
-    facet_grid(year ~ trt, labeller = labeller(trt = c(p_scales$labs_trt))
-    ) +
-    theme_bw() +
-    labs(y = "ln[mass]", x = "days to instar",
-         col = "population", lty = "population") +
-    guides(lty = guide_legend(override.aes = list(alpha = 1),
-                              order = 1),
-           col = guide_legend(override.aes = list(alpha = 1),
-                              order = 1),
-           shape = guide_legend(override.aes = list(alpha = 1),
-                                order = 3)
-    ) 
-}
-```
-
-### successful pups only
-
-```{r}
-# successful pups only
-dfs_viz$long %>%
-  filter(is.pup > 0) %>% 
-  .prepfn() %>% #View()
-  .plotfn() +
-  geom_point(size = 1.75, alpha = 0.8) +
-  geom_line(alpha = 0.8) +
-  labs(shape = "instars to\npupation",
-       caption = "trajectory of successful pupations")
-#ResToFig("supp_dev-traj")
-```
-
-### pmd + pups
-
-```{r}
-# shared dfs
-df <- dfs_viz$wide %>%
-  filter(!is.na(is.pup), 
-         !is.na(jdate.5th),
-         ) %>%
-  DevToLong() %>%
-  mutate(is.pup = case_when(is.pup > 1 ~ 1,
-                            TRUE ~ is.pup),
-         is.pup = factor(is.pup, levels = c(1, 0))) %>%
-  group_by(is.pup) %>% 
-  .prepfn() #%>% View()
-```
-
-
-```{r}
-# V1: all yrs simultaneously
-# pups in 5 and dead/alive sups
-# (no pmds < 5)
-df %>%
-  .plotfn() +
-  geom_point(size = 1.75) +
-  geom_line() +
-  aes(alpha = is.pup,
-      group = interaction(is.pup, pop, sup)) +
-  labs(shape = "instars to outcome", alpha = "outcome",
-       caption = "outcomes of 5ths + sups")+
-  scale_shape_manual(values = c(16, 17, 15, 7)) +
-  scale_alpha_manual(values = c(0.6, 1),
-                     labels = c(`0` = "died", `1` = "pupated")) +
-  guides(alpha = guide_legend(override.aes = list(alpha = c(0.4, 1)),
-                              order = 2))
-#ResToFig("supp_dev-traj-all")
-
-```
-
-```{r}
-# V2: separate out yrs
-.plotfn2 <- function(x){
-  x %>%
-    .plotfn() +
-    geom_point(size = 1.75, alpha = 0.7) +
-    geom_line(alpha = 0.7) +
-    aes(col = is.pup, lty = is.pup, #alpha = is.pup,
-        group = interaction(is.pup, sup)
-    ) +
-    labs(col = "outcome", lty = "outcome", 
-         shape = "instars to outcome",
-         #caption = paste0(df$year, " 5ths + sups outcomes")
-         ) +
-    facet_grid(pop ~ trt, labeller = labeller(trt = c(p_scales$labs_trt))) +
-    scale_shape_manual(values = c(16, 17, 15, 7)) +
-    scale_color_manual(values = scales::pal_brewer(palette = "Paired", direction = -1)(2),
-                       labels = c(`0` = "died", `1` = "pupated")) +
-    scale_linetype_discrete(labels = c(`0` = "died", `1` = "pupated"))
-}
-
-ps <- list_modify(
-  ps,
-  sup23 = df %>%
-    filter(year == 2023) %>% 
-    .plotfn2() + 
-    guides(shape = "none") +
-    theme(legend.position = "none",
-          axis.title.x = element_blank(),
-          axis.ticks.x = element_blank(),
-          axis.text.x = element_blank()),
-  sup24 = df %>%
-    filter(year == 2024) %>% 
-    .plotfn2() + 
-    theme(legend.position = "none",
-          strip.background.x = element_blank(),
-          strip.text.x = element_blank(),
-          axis.title.x = element_blank(),
-          axis.ticks.x = element_blank(),
-          axis.text.x = element_blank()),
-  sup25 = df %>%
-    filter(year == 2025) %>% 
-    .plotfn2() +
-    guides(shape = "none") +
-    #labs(caption = "yearly 5ths + sups outcomes") +
-    theme(strip.background.x = element_blank(),
-          strip.text.x = element_blank())
-)
-
-ps$sup23
-ps$sup24
-ps$sup25
-
-# collate (this works..)
-((ps$sup23 + theme(legend.position = "none")) +
-  (ps$sup24) +
-  (ps$sup25 + theme(legend.position = "none") 
-   )) +
-  plot_layout(ncol = 1, axes = "collect", guides = "collect"
-              ) &
-  xlim(c(0, 42)) &
-  theme(legend.position = "bottom",
-        legend.margin = margin())
-
-#ResToFig("supp_dev-traj_all-sups")
-```
-```{r eval = FALSE}
-## V3a: alternative consolidation, and include 4ths
-df <- dfs_viz$wide %>%
-  #filter(!is.na(jdate.4th)) %>%
-  mutate(is.pup = case_when(is.na(is.pup) ~ 0,
-                            is.pup > 1 ~ 1,
-                            TRUE ~ is.pup),
-         sup = case_when(is.na(sup) & !is.na(jdate.5th) ~ 5,
-                         #is.na(sup) & !is.na(jdate.4th) ~ 4,
-                         is.na(sup) ~ 0, # ie any pmd before pup
-                         TRUE ~ sup),
-         # is.sup = case_when(is.na(is.sup) ~ 0,
-         #                    TRUE ~ is.sup),
-         across(c("sup", starts_with("is.")), ~ as.factor(.x)),
-         is.pup = factor(is.pup, levels = c(1, 0))
-         ) %>%
-  DevToLong() %>%
-  filter(instar %in% c("wander") | grepl("\\d.*", instar)) %>%
-  group_by(year, pop, trt, trt.type, trt.minT, instar, 
-           is.pup, #is.sup, 
-           sup) %>%
-  CalcDevSS()
-
-.p <- function(x){
-  x %>%
-    ggplot(aes(y = avg.logmass, x = avg.tt,
-               shape = sup,
-               col = is.pup, lty = is.pup, 
-               group = interaction(is.pup, sup))) +
-    geom_point(size = 1.75) +
-    geom_line() +
-    facet_grid(pop ~ trt, labeller = labeller(trt = c(p_scales$labs_trt))) 
-}
-
-.p2 <- function(){
-  list(
-    theme_bw(),
-    labs(y = "ln[mass]", x = "days to instar",
-         col = "population", lty = "population"),
-    guides(lty = guide_legend(override.aes = list(alpha = 1),
-                              order = 1),
-           col = guide_legend(override.aes = list(alpha = 1),
-                              order = 1),
-           shape = guide_legend(override.aes = list(alpha = 1),
-                                order = 3)
-    ),
-    labs(col = "outcome", lty = "outcome", 
-         #shape = "instars to outcome",
-         #caption = paste0(df$year, " 5ths + sups outcomes")
-         ),
-    scale_shape_manual(values = c(`0` = 1, `5` = 16, `6` = 17, `7` = 15, `8` = 7)), # instars 4, 5, 6+
-    scale_color_manual(values = scales::pal_brewer(palette = "Paired", direction = -1)(2),
-                       labels = c(`0` = "died", `1` = "pupated")),
-    scale_linetype_discrete(labels = c(`0` = "died", `1` = "pupated"))
-  )
-}
-
-    
-ps <- list_modify(
-  ps,
-  sup23 = df %>%
-    filter(year == 2023) %>% 
-    .p(),
-    # guides(shape = "none") +
-    # theme(legend.position = "none",
-    #       axis.title.x = element_blank(),
-    #       axis.ticks.x = element_blank(),
-    #       axis.text.x = element_blank()),
-  sup24 = df %>%
-    filter(year == 2024) %>% 
-    .p(),
-    # theme(legend.position = "none",
-    #       strip.background.x = element_blank(),
-    #       strip.text.x = element_blank(),
-    #       axis.title.x = element_blank(),
-    #       axis.ticks.x = element_blank(),
-    #       axis.text.x = element_blank()),
-  sup25 = df %>%
-    filter(year == 2025) %>% 
-    .p(),
-    # guides(shape = "none") +
-    # theme(strip.background.x = element_blank(),
-    #       strip.text.x = element_blank())
- )
-
-ps$sup23
-ps$sup24
-ps$sup25
-
-# collate: this does not as well -- so specify theme changes in the ggobject instead
-(ps$sup23 +
-    guides(shape = "none") +
-    theme(legend.position = "none",
-          axis.title.x = element_blank(),
-          axis.ticks.x = element_blank(),
-          axis.text.x = element_blank())) /
-  (ps$sup24 +
-      theme(#legend.position = "none",
-          strip.background.x = element_blank(),
-          strip.text.x = element_blank(),
-          axis.title.x = element_blank(),
-          axis.ticks.x = element_blank(),
-          axis.text.x = element_blank())
-     ) /
-  (ps$sup25 +
-     guides(shape = "none") +
-    
-    theme(strip.background.x = element_blank(),
-          strip.text.x = element_blank(),
-          legend.position = "none")
-     ) +
-  plot_layout(axes = "collect", guides = "collect") &
-  .p2() &
-  theme(legend.position = "bottom")
-
-# (ps$sup23 / ps$sup24 / ps$sup25 ) +
-#   plot_layout(axes = "collect", guides = "collect") +
-#   .p2()
-```
-
-## misc development
-
-### stage of death
-
-```{r}
-# what stage are most things dying at?
-
-ps <- list_modify(
-  ps,
-  dev_mortality = dfs_viz$wide %>%
-  filter(is.pup == 0) %>%
-  mutate(#is.wander = case_when(!is.na(jdate.wander) ~ 1,
-                             # TRUE ~ 0),
-         # is.sup = case_when(is.na(jdate.wander) & !is.na(jdate.6th) ~ 1,
-         #                    TRUE ~ 0),
-
-         is.5th = case_when(#(is.na(jdate.wander) #| is.na(jdate.6th)
-                            # ) &
-                              !is.na(jdate.5th) ~ 1, # change to & if counting sups
-                            TRUE ~ 0),
-         is.4th = case_when(is.na(jdate.5th) & !is.na(jdate.4th) ~ 1,
-                            TRUE ~ 0),
-         is.3rd = case_when(is.na(jdate.4th) #& !is.na(jdate.3rd)
-                            ~ 1,
-                            TRUE ~ 0)) %>%
-  group_by(#year, 
-           pop, trt, trt.type, trt.minT) %>%
-  summarise(N = n(),
-            #died.wander = sum(is.wander),
-            #died.sup = sum(is.sup),
-            died.5th = sum(is.5th),
-            died.4th = sum(is.4th),
-            died.3rd = sum(is.3rd),
-            # died.early = N - sum(died.wander, #died.sup, 
-            #                      died.5th, died.4th, died.3rd),
-            #prop.wander = died.wander/N,
-            #prop.sup = died.sup/N,
-            prop.5th = died.5th/N,
-            prop.4th = died.4th/N,
-            prop.3rd = died.3rd/N,
-            #prop.early = died.early/N
-            ) %>%
-  pivot_longer(cols = starts_with("prop"),
-               names_to = c(".value", "instar"),
-               names_sep = "\\.") %>%
-  mutate(instar = factor(instar, levels = c("wander", #"sup", 
-                                            "5th", "4th", "3rd", "early"
-                                            ))) %>%
-  ggplot(aes(y = prop, #x = interaction(trt.minT, trt.type),
-             x = trt,
-             fill = instar)) +
-  geom_col(position = "stack") +
-  facet_grid(~pop) +
-  geom_text(data = . %>% distinct(N, .by = trt, .keep_all = TRUE), 
-            mapping = aes(label = N, y = 1.05)) +
-  #scale_fill_brewer(palette = "Blues", direction = -1) +
-  scale_fill_manual(values = c("3rd" = "#BDD7E7", "4th" = "#6BAED6", "5th" = "#2171B5"),
-                    labels = c("5th" = "≥ 5th", "4th" = "4th", "3rd" = "≤ 3rd")
-                    ) +
- scale_x_discrete(#labels = c("26.ctrl" = "Control (26°C)", 
-                  #         "19.expt" = "NTW (19°C)", "26.expt" = "NTW (26°C)", "33.expt" = "NTW (33°C)")
-                  labels = p_scales$labs_trt) +
-  theme_bw() +
-  labs(y = "proportion", 
-       fill = "instar died", 
-       #caption = "N = total deaths",
-       x = p_scales$xlab_trt)
-)
-
-ps$dev_mortality
-```
-### mean growth rate
-
-```{r}
-# dev to 5th vs dev to wander
-ps <- list_modify(
-  ps,
-  dev_GRwander = 
-    dfs_viz$wide %>%
-  mutate(gr.5th = log(mass.5th)/tt.5th,
-         gr.wander = log(mass.wander)/tt.wander,
-         gr.pupa = log(mass.pupa)/tt.pupa) %>%
-  pivot_longer(cols = c("gr.5th", "gr.wander", "gr.pupa"),
-               names_to = c(".value", "instar"),
-               names_sep = "\\.") %>%
-  group_by(pop, trt, trt.minT, trt.type, instar) %>%
-  summarise(mean.gr = mean(gr, na.rm = TRUE),
-            se.gr = se(gr)) %>%
-  mutate(instar = factor(instar, levels = c("5th", "wander", "pupa"))) %>%
-  #filter(instar %in% c("wander", "pupa")) %>%
-  filter(instar == "wander") %>%
-  Plot_Dev() +
-  aes(y = mean.gr) +
-  # ggplot(aes(y = mean.gr, x = trt.minT,
-  #            shape = pop, lty = pop, col = trt.type,
-  #            group = interaction(pop, trt.type))) +
-  geom_point(size = 2) +
-  geom_line() +
-  geom_errorbar((aes(ymax = mean.gr + se.gr,
-                     ymin = mean.gr - se.gr)),
-                lty = "solid", width = 0.25, show.legend = FALSE) +
-  #facet_wrap(~instar) +
-  #scale_color_hue(direction = -1) +
-  theme_bw() +
-  labs(y = "growth rate (ln(g)/day)")
-)
-
-ps$dev_GRwander
-
-```
-### time in 5th/instars
-
-do bugs get the same level of HS as meggans bugs?
-(no -- bugs spend more cumulative time at 40C)
+## (ST1)  sample sizes
 
 ```{r}
 dfs_viz$wide %>%
-  mutate(length.5th = tt.wander - tt.5th) %>%
-  group_by(pop, trt, #year
-           ) %>%
-  summarise(mean.5th = mean(length.5th, na.rm = TRUE),
-            se.5th = se(length.5th)) #%>% View()
+  group_by(year, pop, trt) %>%
+  summarise(n = sum(!is.na(is.pup)),
+            wand = sum(!is.na(jdate.wander), na.rm = TRUE),
+            pup = sum(is.pup == 1, na.rm = TRUE),
+            ec = sum(is.ec == 1, na.rm = TRUE),
+            #LPI = sum(is.pup == 2, na.rm = TRUE)
+            ) #%>% ResToCsv("dev/n/surv")
 ```
 
-are ctrl bugs taking longer to grow?
-(yes, for the lab...) -- no major sex differences
+## (ST2) mating replicates
 
 ```{r}
-df <- dfs_viz$wide %>%
-  filter(is.sup == 0,
-         #!is.na(sex)
-         ) %>%
-  mutate(length.5th = tt.wander - tt.5th,
-         length.4th = tt.5th - tt.4th,
-         length.3rd = tt.4th - tt.3rd,
-         growth.5th = mass.wander - mass.5th,
-         growth.4th = mass.5th - mass.4th,
-         growth.3rd = mass.4th - mass.3rd,
-         across(starts_with("growth"), ~ log(.x))) %>%
-  pivot_longer(starts_with(c("length", "growth")),
-               names_to = c(".value", "instar"),
-               names_sep = "\\.") %>% #View()
-  group_by(pop, trt, year, instar,
-           #sex
-           ) %>%
-  summarise(across(c("length", "growth"),
-            .fns = list(mean = ~ mean(.x, na.rm = TRUE),
-                        se = se),
-            .names = "{.fn}_{.col}")) %>% #View()
-  pivot_longer(starts_with(c("mean_", "se_")),
-              names_to = c(".value", "metric"),
-              names_sep = "_")
-  
-df %>%  
-  filter(trt == 260) %>%
-  ggplot(aes(y = instar, x = mean,
-             lty = sex, col = year, shape = instar,
-             group = interaction(pop, sex, year))
-         ) +
-  geom_point() +
-  geom_line() +
-  facet_grid(pop~metric,
-             scales = "free_x") +
-  scale_color_brewer(palette = "Blues") +
-  theme_bw() +
-  labs(x = "mean change")
+
+
+# per cage
+dfs_stats$eggs %>%
+  group_by(year, trt.minT, trt.mate, cage) %>%
+  summarise(perc.f = sum(n.f),
+            perc.m = sum(n.m),
+            perc.rat = n.f/n.m,
+            perc.coll = sum(n.coll),
+            perc.hatch = sum(n.hatch)) #%>% ResToCsv("tents/n/percage")
+
+# per trt combo
+dfs_stats$eggs %>%
+  mutate(rat = n.f/n.m,
+         tot.ads = n.f + n.m) %>%
+  group_by(year,  trt.minT, trt.mate) %>%
+  summarise(n = n(),
+            tot.f = sum(n.f),
+            tot.m = sum(n.m),
+            avg.rat = mean(rat),
+            avg.ads = mean(tot.ads),
+            tot.coll = sum(n.coll),
+            tot.hatch = sum(n.hatch)) #%>% View() #%>% ResToCsv("tents/n/pertrt")
 ```
-
-### patchwork
-```{r}
-ps$dev_GRwander / ps$dev_mortality +
-  plot_annotation(tag_levels = "A") +
-  plot_layout() &
-  theme(#legend.position = "bottom", 
-        legend.box = "vertical", 
-        legend.margin = margin()
-        )
-
-#ResToFig("supp/dev_outcomes.png")
-```
-
-
-## sup
-
-### N supernumerary
-
-```{r}
-# dfs_stats$dev_all %>%
-#   # filter(!is.na(jdate.5th)) %>%
-#   # mutate(sup = case_when(is.na(sup) ~ 5,
-#   #                           TRUE ~ sup)) %>%
-#   filter(!is.na(jdate.6th)) %>%
-#   group_by(year, pop, trt, 
-#            ) %>%
-#   mutate(N = n()) %>%
-#   group_by(sup, #is.pup
-#            .add = TRUE, ) %>%
-#   mutate(n = n(),
-#          prop = n/N
-#   ) %>%
-#   select(c(year, pop, trt, sup, N, n, prop)) %>%
-#   distinct()
-# 
-# %>%
-#   pivot_wider(names_from = "sup", names_prefix = "i",
-#               values_from = "prop") %>%
-#   mutate(across(matches("i\\d"), ~ replace_na(.x, 0)))
-
-df <- dfs_stats$dev_all %>%
-    filter(is.pup == 1) %>%
-    group_by(across(c(#year, 
-      trt, trt.type, pop, trt.minT)),
-    ) %>%
-    summarise(N = n(),
-              # raw counts/overall # sups
-              # prop.sup = sum(is.sup == 1, na.rm = TRUE)/N,
-              # pct.sup = round(prop.sup*100, 1),
-              # i6 = sum(sup == 6, na.rm = TRUE),
-              # i7 = sum(sup == 7, na.rm = TRUE),
-              # i8 = sum(sup == 8, na.rm = TRUE),
-              
-              # prop sups + non sups
-              prop.i5 = sum(is.sup == 0, na.rm = TRUE)/N,
-              prop.i6 = sum(sup == 6, na.rm = TRUE)/N,
-              prop.i7 = sum(sup == 7, na.rm = TRUE)/N,
-    ) %>% 
-    SSToLong() %>%
-    ungroup() %>%
-    filter(!(pop == "lab" & response == "i7")) #%>% View()
-  
-ps <- list_modify(
-  ps,
-  sup_prop_Tmin = df %>%
-    mutate(mid_y = cumsum(prop) - prop/2, .by = c(trt.type, pop, trt.minT)) %>% 
-    ggplot(aes(y = mid_y, x = trt.minT,
-               #fill = interaction(pop, response), 
-               fill = pop,
-               group = pop,
-               height = prop
-    )) +
-    geom_tile(aes(alpha = response),
-              position = position_dodge(0.7), width = 0.7*0.85) +
-    geom_text(data = . %>% distinct(across(c(N, pop, trt.minT)), .keep_all = TRUE),
-              mapping = aes(label = N, y = 1.05), position = position_dodge(0.7)) +
-    facet_grid(~trt.type, scales = "free_x", space = "free") +
-    # scale_fill_manual(values = c("lab.i5" = "#C2A5CF", "lab.i6" = "#9970AB", #"lab.i7" = "#762A83",
-    #                              "field.i5" = "#A6DBA0", "field.i6" = "#5AAE61", "field.i7" = "#1B7837"),
-    #                   limits = c("lab.i5", "lab.i6", "field.i5", "field.i6", "field.i7")) +
-    # TODO tldr i think just override these withh guides() lol, and treat fill as "hue" instead
-    scale_fill_manual(values = c("#762A83", "#1B7837")) +
-    scale_alpha_manual(values = c(0.4, 0.8, 1)) +
-    theme_bw() +
-    labs(y = "proportion", x = "larval Tmin"),
-  
-  sup_prop_pop = df %>%
-    mutate(response = factor(response, levels = c("i7", "i6", "i5"))) %>%
-    ggplot(aes(y = prop, x = trt,
-               fill = response)) +
-    geom_col(position = "stack") +
-    facet_grid(~pop) +
-    geom_text(data = . %>% distinct(N, .by = trt, .keep_all = TRUE), 
-              mapping = aes(label = N, y = 1.05)) +
-    scale_fill_manual(values = c("i5" = "#BDD7E7", "i6" = "#6BAED6", "i7" = "#2171B5"),
-                      labels = c("i5" = "5", "i6" = "6", "i7" = "7")) +
-    scale_x_discrete(labels = p_scales$labs_trt) +
-    theme_bw() +
-    labs(y = "proportion", 
-         x = p_scales$xlab_trt,
-         fill = "larval instars")
-)
-
-ps$sup_prop_Tmin
-ps$sup_prop_pop
-
-#ResToFig("supp/prop_sup")
-```
-
-### supernumerary dev time
- 
-(lol this is interesting..)
-
-```{r}
-ps <- list_modify(
-  ps,
-  sup_dev = dfs_viz$wide %>%
-    mutate(sup = case_when(!is.na(jdate.5th) & is.na(jdate.6th) ~ 5,
-                           TRUE ~ sup),
-           tt.exit = case_when(!is.na(jdate.pmd) ~ jdate.pmd - jdate.hatch,
-                               !is.na(jdate.pupa) ~ jdate.pupa - jdate.hatch,
-                               !is.na(jdate.LPI) ~ jdate.LPI  - jdate.hatch),
-           is.pup = case_when(!is.na(jdate.LPI) ~ 1,
-                                TRUE ~ is.pup)
-    ) %>%
-    filter(pop != "col",
-           !is.na(sup),
-           is.pup == 1
-           ) %>% 
-    DevToLong() %>%
-    group_by(across(c(pop, diet, starts_with("trt"), instar, sup, is.pup))) %>%
-    CalcDevSS() %>% 
-  filter(instar == "exit",
-  ) %>%
-    Plot_Dev() +
-    aes(y = avg.tt) +
-    # ggplot(aes(y = avg.tt, x = trt.minT,
-    #            shape = pop, 
-    #            lty = pop,
-    #            col = interaction(trt.type, is.pup),
-    #            group = interaction(pop, trt.type, is.pup)
-    # )
-    # ) +
-    geom_errorbar(aes(ymax = avg.tt + se.tt,
-                      ymin = avg.tt - se.tt),
-                  lty = "solid", show.legend = FALSE, width = 0.25) +
-    #facet_grid(is.pup ~ sup) +
-    facet_wrap(~sup, labeller = as_labeller(c('5' = '5 instars', '6' = '6 instars', '7' = '7 instars'))) +
-    #geom_point(aes(size = n), alpha = 0.8) +
-    geom_point(size = 2) +
-    geom_line() +
-    # scale_color_manual(values = c("ctrl.0" = "#A6CEE3", "ctrl.1" = "#1F78B4", 
-    #                               "expt.0" = "#FDBF6F", "expt.1" = "#FF7F00"),
-    #                    labels = c("ctrl.0" = "ctrl, died", "ctrl.1" = "ctrl, pupa", 
-    #                               "expt.0" = "NTW, died", "expt.1" = "NTW, pupa"),
-    #                    limits = c(#"ctrl.0", 
-    #                               "ctrl.1", 
-    #                               #"expt.0", 
-    #                               "expt.1"
-    #                    ),
-    # ) +
-    labs(#col = "treatment type + outcome",
-         #y = "time to outcome (days)",
-         y = "larval duration (days)",
-         #x = "larval Tmin",
-         x = p_scales$xlab_minT
-         #caption = "pupated at end of instar"
-    ) +
-    # guides(shape = guide_legend(override.aes = list(size = c(2, 2),
-    #                                                 linetype = c("solid", "255F")))) +
-    theme_bw()
-  
-)
-
-ps$sup_dev
-
-```
-
-### supp patchwork
-
-```{r}
-ps$sup_prop_pop / ps$sup_dev +
-  plot_annotation(tag_levels = "A") +
-  plot_layout() &
-  theme(#legend.position = "bottom", 
-        #legend.box = "vertical", 
-        legend.margin = margin())
-
-#ResToFig("supp/sup-dev")
-```
-
-
-
-## pupal correlations
-
-### pupal mass outcomes
-
-i.e. did they eclose or die (mvw)
-
-```{r}
-ps <- list_modify(
-  ps,
-  pupmass_surv = dfs_viz$wide %>%
-  filter(!is.na(mass.pupa)) %>%
-  mutate(mass.pupa = mass.pupa/1000,
-         # jk alrdy took the LPIs out lol
-         # is.ec2 = case_when(!is.na(is.LPI) ~ 2,
-         #                    TRUE ~ is.ec),
-         # is.ec2 = factor(is.ec2, levels = c(1, 2, 0)),
-         is.ec = factor(is.ec, levels = c(1, 0))
-         ) %>% #View()
-  group_by(pop, trt) %>%
-  mutate(avg.mass = mean(mass.pupa, na.rm = TRUE)) %>%
-  ungroup() %>%
-  #DevToLong() %>%
-  ggplot(aes(x = mass.pupa, fill = is.ec)) +
-  geom_histogram(#aes(y = ..density..), 
-                 binwidth = 0.5) +
-  #geom_vline(aes(xintercept = avg.mass)) +
-  # facet_grid(pop ~ trt, scales = "free_y",
-  #            labeller = labeller(trt = p_scales$labs_trt)
-  #            ) +
-  facet_grid(~ pop) +
-  theme(axis.text = element_text(angle = 45)) +
-  theme_bw() +
-  scale_fill_manual(values = c(scales::brewer_pal(palette = "Paired", 
-                                                   direction = -1)(2)),
-                     labels = c(`0` = "no", `1` = "yes"#, `2` = "LPI"
-                                )
-                     ) +
-  labs(x = "pupal mass (g)",
-       fill = "eclosed?",
-       #caption = "(not always clear if pupae died)"
-       )
-)
-
-ps$pupmass_surv
-
-#ResToFig("supp/pupmass-surv")
-```
-
-### time to eclosion
-
-```{r}
-# correlated w/ mass? or pct change in mass?
-
-ps <- list_modify(
-  ps,
-  pupmass_timeec = 
-    dfs_viz$wide %>%
-  filter(!is.na(mass.pupa)) %>%
-  mutate(mass.pupa = mass.pupa/1000,
-         mass.eclose = mass.eclose/1000,
-         # jk alrdy took the LPIs out lol
-         # is.ec2 = case_when(!is.na(is.LPI) ~ 2,
-         #                    TRUE ~ is.ec),
-         # is.ec2 = factor(is.ec2, levels = c(1, 2, 0)),
-         is.ec = factor(is.ec, levels = c(1, 0)),
-         
-         # pupal change?
-         mass.change = mass.pupa - mass.eclose,
-         #prop.change = mass.eclose/mass.pupa, # or change/pupa??
-         pct.loss = 1 - (mass.eclose/mass.pupa) # see molleman ea 2011
-         ) %>% #View()
-  filter(is.ec == 1,
-         tt.eclose < 60) %>%
-  #group_by(pop, trt, sex) %>%
-  #mutate(avg.mass = mean(mass.pupa, na.rm = TRUE)) %>%
-  #ungroup() %>%
-  #DevToLong() %>%
-  ggplot(aes(#x = mass.pupa, 
-             #x = mass.change,
-             #x = prop.change,
-             x = pct.loss,
-             y = tt.eclose,
-             col = pop, lty = pop, shape = pop,
-             #fill = is.ec
-             )) +
-  geom_point(alpha = 0.35) +
-  #geom_vline(aes(xintercept = avg.mass)) +
-  # facet_grid(pop ~ trt, scales = "free_y",
-  #            labeller = labeller(trt = p_scales$labs_trt)
-  #            ) +
-  # theme(axis.text = element_text(angle = 45)) +
-  
-  #facet_grid(sex ~ trt, labeller = labeller(trt = p_scales$labs_trt)) +
-  #facet_grid(~ sex, labeller = labeller(sex = c("f" = "female", "m" = "male"))) +
-  theme_bw() +
-  # scale_fill_manual(values = c(scales::brewer_pal(palette = "Paired", 
-  #                                                  direction = -1)(2)),
-  #                    labels = c(`0` = "no", `1` = "yes"#, `2` = "LPI"
-  #                               )
-  #                    ) +
-  labs(#x = "pupal mass (g)",
-       x = "% weight loss after eclosion",
-       y = "pupal duration (days)",
-       col = "population", shape = "population", lty = "population"
-       #fill = "eclosed?",
-       #caption = "(not always clear if pupae died)"
-       ) +
-  geom_smooth(method = "lm", lwd = 1, fullrange = TRUE, #se = FALSE,
-              alpha = 0.3, #show.legend = FALSE, 
-              #fill = NA,
-              aes(lty = pop),
-              #guides(color = guide_legend(override.aes = list(fill = NA)))
-              ) +
-  scale_color_manual(values = c("#984EA3", "#4DAF4A")) +
-  #scale_linetype_manual(values = c("solid", "dashed"))+
-  guides(color = guide_legend(override.aes = list(size = 2,
-                                                  alpha = 1,
-                                                  lwd = 0.75,
-                                                  fill = NA,
-                                                  linetype = c("solid", "255F")
-                                                  )
-                              )
-  )
-)
-
-ps$pupmass_timeec
-
-#ResToFig("supp/pupmass-timeec")
-
-```
-
-### patchwork
-
-```{r}
-(ps$pupmass_surv / ps$pupmass_timeec) +
-  plot_annotation(tag_levels = "A") +
-  plot_layout(#guides = "collect"
-    ) &
-  theme(#legend.position = "bottom",
-        #legend.key.justification = "center",
-        #legend.margin = margin()
-        )
-
-#ResToFig("supp/pupmass-outcomes")
-
-# get R^2
-df <- dfs_viz$wide %>%
-  filter(is.ec == 1,
-         tt.eclose < 60) %>%
-  mutate(mass.pupa = mass.pupa/1000,
-         mass.eclose = mass.eclose/1000,
-         pct.loss = 1 - (mass.eclose/mass.pupa))
-
-mods <- list(
-  lab = lm(tt.eclose ~ mass.pupa, data = df %>% filter(pop == "lab")),
-  field = lm(tt.eclose ~ mass.pupa, data = df %>% filter(pop == "field")),
-  lab2 = lm(tt.eclose ~ pct.loss + sex, data = df %>% filter(pop == "lab")),
-  field2 = lm(tt.eclose ~ pct.loss + sex, data = df %>% filter(pop == "field"))
-)
-
-summary(mods$lab) # y = -0.05464x + 24.75 (adj R^2 = -0.003)
-summary(mods$field) # y = 0.7807x + 24.95 (adj R^2 = 0.003)
-
-summary(mods$lab2) # y = 5.748x + 21.464 (adj R^2 = 0.009494)
-summary(mods$field2) # y = 1.765x + 26.362 (adj R^2 = -0.005011 )
-```
-
-## adult correlations
-
-### adult size distribution
-
-```{r}
-# sizes of adults
-dfs_viz$wide %>%
-  filter(!is.na(mass.eclose),
-         year != 2024,
-         if.fridge == 0,
-         if.mated == 1) %>%
-  mutate(mass.eclose = mass.eclose/1000) %>%
-  #DevToLong() %>%
-  ggplot(aes(x = mass.eclose, fill = pop)) +
-  geom_histogram(binwidth = 0.5, #position = "stack"
-                 ) +
-  facet_grid(year ~ trt, 
-             #scales = "free_x",
-             labeller = labeller(trt = p_scales$labs_trt)
-             ) +
-  theme(axis.text = element_text(angle = 45)) +
-  theme_bw() +
-  labs(x = "adult mass (g)")
-```
-
-### adult mass & lifespan
-
-```{r}
-dfs_viz$wide %>%
-  filter(!is.na(mass.eclose),
-         year != 2024,
-         if.fridge == 0,
-         if.mated == 1) %>%
-  mutate(mass.eclose = mass.eclose/1000) %>%
-  #DevToLong() %>%
-  ggplot(aes(y = tt.long,x = mass.eclose, 
-             shape = pop, col = year)) +
-  geom_smooth(aes(lty = pop), method = "lm", lwd = 0.5, alpha = 0.6) +
-  geom_point(size = 1.5, alpha = 0.5) +
-  # facet_grid(year ~ trt, 
-  #            #scales = "free_x",
-  #            labeller = labeller(trt = p_scales$labs_trt)
-  #            ) +
-  # theme(axis.text = element_text(angle = 45)) +
-  theme_bw() +
-  facet_wrap(~sex) +
-  labs(x = "adult mass (g)")
-
-# look at other things
-df <- dfs_viz$wide %>%
-  filter(year != 2024, if.fridge == 0, if.mated == 1)
-  
-mods <- lmer(tt.long ~ mass.eclose + sex + (1|year), df)
-summary(mods)
-drop1(mods) # lifespan not affected by sex/mass?
-
-drop1(lm(tt.long ~ trt + year, df), test = "Chisq") # year is sig lol..
-```
-
-
 
 # # reproduction
-TODO
-- check that all the tents being counted are actually tents for mating lol (e.g. wtf is 107-H in 2023)
 
-## eggs collected
+
+## (S4) eggs collected
 
 ### main
 
@@ -2350,7 +1492,7 @@ drop1(update(mods$expt_all, ~ . - trt.minT:mate.ishs), test = "Chisq") # no effe
 ```
 
 
-## eggs hatched
+## (S5) eggs hatched
 
 ### main
 
@@ -2487,33 +1629,313 @@ dfs_viz$eggs_ss %>%
            starts_with(c("n.", "avg.", "se.")))) #%>% ResToCsv("egg results")
 ```
 
-### mating replicates
+# # development
+
+## (S6) prop sup
+
+### N supernumerary
+
 ```{r}
-# TODO ideally use the same as the viz but maybe need to use the stats one lol cuz its on the per-tent level
-# need to check the colony filtering on this...
+# dfs_stats$dev_all %>%
+#   # filter(!is.na(jdate.5th)) %>%
+#   # mutate(sup = case_when(is.na(sup) ~ 5,
+#   #                           TRUE ~ sup)) %>%
+#   filter(!is.na(jdate.6th)) %>%
+#   group_by(year, pop, trt, 
+#            ) %>%
+#   mutate(N = n()) %>%
+#   group_by(sup, #is.pup
+#            .add = TRUE, ) %>%
+#   mutate(n = n(),
+#          prop = n/N
+#   ) %>%
+#   select(c(year, pop, trt, sup, N, n, prop)) %>%
+#   distinct()
+# 
+# %>%
+#   pivot_wider(names_from = "sup", names_prefix = "i",
+#               values_from = "prop") %>%
+#   mutate(across(matches("i\\d"), ~ replace_na(.x, 0)))
 
-# per cage
-dfs_stats$eggs %>%
-  group_by(year, trt.minT, trt.mate, cage) %>%
-  summarise(perc.f = sum(n.f),
-            perc.m = sum(n.m),
-            perc.rat = n.f/n.m,
-            perc.coll = sum(n.coll),
-            perc.hatch = sum(n.hatch)) #%>% ResToCsv("tents/n/percage")
+df <- dfs_stats$dev_all %>%
+    filter(is.pup == 1) %>%
+    group_by(across(c(#year, 
+      trt, trt.type, pop, trt.minT)),
+    ) %>%
+    summarise(N = n(),
+              # raw counts/overall # sups
+              # prop.sup = sum(is.sup == 1, na.rm = TRUE)/N,
+              # pct.sup = round(prop.sup*100, 1),
+              # i6 = sum(sup == 6, na.rm = TRUE),
+              # i7 = sum(sup == 7, na.rm = TRUE),
+              # i8 = sum(sup == 8, na.rm = TRUE),
+              
+              # prop sups + non sups
+              prop.i5 = sum(is.sup == 0, na.rm = TRUE)/N,
+              prop.i6 = sum(sup == 6, na.rm = TRUE)/N,
+              prop.i7 = sum(sup == 7, na.rm = TRUE)/N,
+    ) %>% 
+    SSToLong() %>%
+    ungroup() %>%
+    filter(!(pop == "lab" & response == "i7")) #%>% View()
+  
+ps <- list_modify(
+  ps,
+  sup_prop_Tmin = df %>%
+    mutate(mid_y = cumsum(prop) - prop/2, .by = c(trt.type, pop, trt.minT)) %>% 
+    ggplot(aes(y = mid_y, x = trt.minT,
+               #fill = interaction(pop, response), 
+               fill = pop,
+               group = pop,
+               height = prop
+    )) +
+    geom_tile(aes(alpha = response),
+              position = position_dodge(0.7), width = 0.7*0.85) +
+    geom_text(data = . %>% distinct(across(c(N, pop, trt.minT)), .keep_all = TRUE),
+              mapping = aes(label = N, y = 1.05), position = position_dodge(0.7)) +
+    facet_grid(~trt.type, scales = "free_x", space = "free") +
+    # scale_fill_manual(values = c("lab.i5" = "#C2A5CF", "lab.i6" = "#9970AB", #"lab.i7" = "#762A83",
+    #                              "field.i5" = "#A6DBA0", "field.i6" = "#5AAE61", "field.i7" = "#1B7837"),
+    #                   limits = c("lab.i5", "lab.i6", "field.i5", "field.i6", "field.i7")) +
+    # TODO tldr i think just override these withh guides() lol, and treat fill as "hue" instead
+    scale_fill_manual(values = c("#762A83", "#1B7837")) +
+    scale_alpha_manual(values = c(0.4, 0.8, 1)) +
+    theme_bw() +
+    labs(y = "proportion", x = "larval Tmin"),
+  
+  sup_prop_pop = df %>%
+    mutate(response = factor(response, levels = c("i7", "i6", "i5"))) %>%
+    ggplot(aes(y = prop, x = trt,
+               fill = response)) +
+    geom_col(position = "stack") +
+    facet_grid(~pop) +
+    geom_text(data = . %>% distinct(N, .by = trt, .keep_all = TRUE), 
+              mapping = aes(label = N, y = 1.05)) +
+    scale_fill_manual(values = c("i5" = "#BDD7E7", "i6" = "#6BAED6", "i7" = "#2171B5"),
+                      labels = c("i5" = "5", "i6" = "6", "i7" = "7")) +
+    scale_x_discrete(labels = p_scales$labs_trt) +
+    theme_bw() +
+    labs(y = "proportion", 
+         x = p_scales$xlab_trt,
+         fill = "larval instars")
+)
 
-# per trt combo
-dfs_stats$eggs %>%
-  mutate(rat = n.f/n.m,
-         tot.ads = n.f + n.m) %>%
-  group_by(year,  trt.minT, trt.mate) %>%
-  summarise(n = n(),
-            tot.f = sum(n.f),
-            tot.m = sum(n.m),
-            avg.rat = mean(rat),
-            avg.ads = mean(tot.ads),
-            tot.coll = sum(n.coll),
-            tot.hatch = sum(n.hatch)) #%>% View() #%>% ResToCsv("tents/n/pertrt")
+ps$sup_prop_Tmin
+ps$sup_prop_pop
+
+#ResToFig("supp/prop_sup")
 ```
+
+### dev time
+ 
+(lol this is interesting..)
+
+```{r}
+ps <- list_modify(
+  ps,
+  sup_dev = dfs_viz$wide %>%
+    mutate(sup = case_when(!is.na(jdate.5th) & is.na(jdate.6th) ~ 5,
+                           TRUE ~ sup),
+           tt.exit = case_when(!is.na(jdate.pmd) ~ jdate.pmd - jdate.hatch,
+                               !is.na(jdate.pupa) ~ jdate.pupa - jdate.hatch,
+                               !is.na(jdate.LPI) ~ jdate.LPI  - jdate.hatch),
+           is.pup = case_when(!is.na(jdate.LPI) ~ 1,
+                                TRUE ~ is.pup)
+    ) %>%
+    filter(pop != "col",
+           !is.na(sup),
+           is.pup == 1
+           ) %>% 
+    DevToLong() %>%
+    group_by(across(c(pop, diet, starts_with("trt"), instar, sup, is.pup))) %>%
+    CalcDevSS() %>% 
+  filter(instar == "exit",
+  ) %>%
+    Plot_Dev() +
+    aes(y = avg.tt) +
+    # ggplot(aes(y = avg.tt, x = trt.minT,
+    #            shape = pop, 
+    #            lty = pop,
+    #            col = interaction(trt.type, is.pup),
+    #            group = interaction(pop, trt.type, is.pup)
+    # )
+    # ) +
+    geom_errorbar(aes(ymax = avg.tt + se.tt,
+                      ymin = avg.tt - se.tt),
+                  lty = "solid", show.legend = FALSE, width = 0.25) +
+    #facet_grid(is.pup ~ sup) +
+    facet_wrap(~sup, labeller = as_labeller(c('5' = '5 instars', '6' = '6 instars', '7' = '7 instars'))) +
+    #geom_point(aes(size = n), alpha = 0.8) +
+    geom_point(size = 2) +
+    geom_line() +
+    # scale_color_manual(values = c("ctrl.0" = "#A6CEE3", "ctrl.1" = "#1F78B4", 
+    #                               "expt.0" = "#FDBF6F", "expt.1" = "#FF7F00"),
+    #                    labels = c("ctrl.0" = "ctrl, died", "ctrl.1" = "ctrl, pupa", 
+    #                               "expt.0" = "NTW, died", "expt.1" = "NTW, pupa"),
+    #                    limits = c(#"ctrl.0", 
+    #                               "ctrl.1", 
+    #                               #"expt.0", 
+    #                               "expt.1"
+    #                    ),
+    # ) +
+    labs(#col = "treatment type + outcome",
+         #y = "time to outcome (days)",
+         y = "larval duration (days)",
+         #x = "larval Tmin",
+         x = p_scales$xlab_minT
+         #caption = "pupated at end of instar"
+    ) +
+    # guides(shape = guide_legend(override.aes = list(size = c(2, 2),
+    #                                                 linetype = c("solid", "255F")))) +
+    theme_bw()
+  
+)
+
+ps$sup_dev
+
+```
+
+### patchwork
+
+```{r}
+ps$sup_prop_pop / ps$sup_dev +
+  plot_annotation(tag_levels = "A") +
+  plot_layout() &
+  theme(#legend.position = "bottom", 
+        #legend.box = "vertical", 
+        legend.margin = margin())
+
+#ResToFig("supp/sup-dev")
+```
+
+## (S7) larval dev 
+
+### mortality
+
+```{r}
+# what stage are most things dying at?
+
+ps <- list_modify(
+  ps,
+  dev_mortality = dfs_viz$wide %>%
+  filter(is.pup == 0) %>%
+  mutate(#is.wander = case_when(!is.na(jdate.wander) ~ 1,
+                             # TRUE ~ 0),
+         # is.sup = case_when(is.na(jdate.wander) & !is.na(jdate.6th) ~ 1,
+         #                    TRUE ~ 0),
+
+         is.5th = case_when(#(is.na(jdate.wander) #| is.na(jdate.6th)
+                            # ) &
+                              !is.na(jdate.5th) ~ 1, # change to & if counting sups
+                            TRUE ~ 0),
+         is.4th = case_when(is.na(jdate.5th) & !is.na(jdate.4th) ~ 1,
+                            TRUE ~ 0),
+         is.3rd = case_when(is.na(jdate.4th) #& !is.na(jdate.3rd)
+                            ~ 1,
+                            TRUE ~ 0)) %>%
+  group_by(#year, 
+           pop, trt, trt.type, trt.minT) %>%
+  summarise(N = n(),
+            #died.wander = sum(is.wander),
+            #died.sup = sum(is.sup),
+            died.5th = sum(is.5th),
+            died.4th = sum(is.4th),
+            died.3rd = sum(is.3rd),
+            # died.early = N - sum(died.wander, #died.sup, 
+            #                      died.5th, died.4th, died.3rd),
+            #prop.wander = died.wander/N,
+            #prop.sup = died.sup/N,
+            prop.5th = died.5th/N,
+            prop.4th = died.4th/N,
+            prop.3rd = died.3rd/N,
+            #prop.early = died.early/N
+            ) %>%
+  pivot_longer(cols = starts_with("prop"),
+               names_to = c(".value", "instar"),
+               names_sep = "\\.") %>%
+  mutate(instar = factor(instar, levels = c("wander", #"sup", 
+                                            "5th", "4th", "3rd", "early"
+                                            ))) %>%
+  ggplot(aes(y = prop, #x = interaction(trt.minT, trt.type),
+             x = trt,
+             fill = instar)) +
+  geom_col(position = "stack") +
+  facet_grid(~pop) +
+  geom_text(data = . %>% distinct(N, .by = trt, .keep_all = TRUE), 
+            mapping = aes(label = N, y = 1.05)) +
+  #scale_fill_brewer(palette = "Blues", direction = -1) +
+  scale_fill_manual(values = c("3rd" = "#BDD7E7", "4th" = "#6BAED6", "5th" = "#2171B5"),
+                    labels = c("5th" = "≥ 5th", "4th" = "4th", "3rd" = "≤ 3rd")
+                    ) +
+ scale_x_discrete(#labels = c("26.ctrl" = "Control (26°C)", 
+                  #         "19.expt" = "NTW (19°C)", "26.expt" = "NTW (26°C)", "33.expt" = "NTW (33°C)")
+                  labels = p_scales$labs_trt) +
+  theme_bw() +
+  labs(y = "proportion", 
+       fill = "instar died", 
+       #caption = "N = total deaths",
+       x = p_scales$xlab_trt)
+)
+
+ps$dev_mortality
+```
+
+
+### mean growth rate
+
+```{r}
+# dev to 5th vs dev to wander
+ps <- list_modify(
+  ps,
+  dev_GRwander = 
+    dfs_viz$wide %>%
+  mutate(gr.5th = log(mass.5th)/tt.5th,
+         gr.wander = log(mass.wander)/tt.wander,
+         gr.pupa = log(mass.pupa)/tt.pupa) %>%
+  pivot_longer(cols = c("gr.5th", "gr.wander", "gr.pupa"),
+               names_to = c(".value", "instar"),
+               names_sep = "\\.") %>%
+  group_by(pop, trt, trt.minT, trt.type, instar) %>%
+  summarise(mean.gr = mean(gr, na.rm = TRUE),
+            se.gr = se(gr)) %>%
+  mutate(instar = factor(instar, levels = c("5th", "wander", "pupa"))) %>%
+  #filter(instar %in% c("wander", "pupa")) %>%
+  filter(instar == "wander") %>%
+  Plot_Dev() +
+  aes(y = mean.gr) +
+  # ggplot(aes(y = mean.gr, x = trt.minT,
+  #            shape = pop, lty = pop, col = trt.type,
+  #            group = interaction(pop, trt.type))) +
+  geom_point(size = 2) +
+  geom_line() +
+  geom_errorbar((aes(ymax = mean.gr + se.gr,
+                     ymin = mean.gr - se.gr)),
+                lty = "solid", width = 0.25, show.legend = FALSE) +
+  #facet_wrap(~instar) +
+  #scale_color_hue(direction = -1) +
+  theme_bw() +
+  labs(y = "growth rate (ln(g)/day)")
+)
+
+ps$dev_GRwander
+
+```
+
+### patchwork
+```{r}
+ps$dev_GRwander / ps$dev_mortality +
+  plot_annotation(tag_levels = "A") +
+  plot_layout() &
+  theme(#legend.position = "bottom", 
+        legend.box = "vertical", 
+        legend.margin = margin()
+        )
+
+#ResToFig("supp/dev_outcomes.png")
+```
+
+
+
 
 # ## dump (ref only)
 
